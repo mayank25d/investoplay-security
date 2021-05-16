@@ -1,0 +1,71 @@
+package com.axis.util;
+
+import java.io.IOException;
+
+import javax.servlet.FilterChain;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import com.axis.services.MTAUserDetailsService;
+
+@Component
+public class JwtRequestFilter extends OncePerRequestFilter {
+
+	@Autowired
+	private MTAUserDetailsService userDetailsService;
+	
+	@Autowired
+	private JwtUtil jwtUtil;
+	
+	private static final Logger logger = LoggerFactory.getLogger(JwtRequestFilter.class);
+	
+	@Override
+	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+			throws ServletException, IOException {
+		
+		// "Authorization" is the header name
+		final String authorizationHeader = request.getHeader("Authorization"); // getting the header from the header name
+		
+		String username = null;
+		String jwt = null;
+		
+		try {
+			if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+				jwt = authorizationHeader.substring(7);
+				username = jwtUtil.extractUsername(jwt);
+			}
+			
+			// if username is null and there is no already existing context in security context holder
+			if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+				UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
+				
+				System.out.println("<----------------------------"+userDetails.getAuthorities());
+				
+				if (jwtUtil.validateToken(jwt)) { // checking if the token still exist or has not expired
+					UsernamePasswordAuthenticationToken upaToken = new UsernamePasswordAuthenticationToken(
+							userDetails, null, userDetails.getAuthorities());
+					upaToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+					
+					SecurityContextHolder.getContext().setAuthentication(upaToken);
+				}
+			}
+		} catch (Exception e) {
+			logger.error("Can NOT set user authentication -> Message: {}", e);
+		}
+		
+		filterChain.doFilter(request, response);
+		
+	}
+
+}
