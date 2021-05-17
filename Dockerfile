@@ -15,6 +15,7 @@ COPY pom.xml .
 # This is a separate step so the dependencies will be cached unless 
 # the pom.xml file has changed.
 RUN chmod +x ./mvnw
+RUN mvn --version
 # RUN mvn install:install-file -Dfile="./stocknote-bridge-java-1.0.1.jar" -DgroupId=io.samco -DartifactId=stocknote-bridge-java -Dversion=1.0.1 -Dpackaging=jar
 RUN ./mvnw dependency:go-offline -B
 
